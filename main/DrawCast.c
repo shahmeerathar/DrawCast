@@ -29,10 +29,18 @@
 #define GREEN 0x7e0
 #define BLUE 0x1f
 
-char draw_buffer[DISPLAY_HEIGHT][DISPLAY_WIDTH];
-int cursor_x;
-int cursor_y;
-bool drawing;
+struct draw_cast_state {
+    char draw_buffer[DISPLAY_HEIGHT][DISPLAY_WIDTH];
+
+    int cursor_x;
+    int cursor_y;
+    bool drawing;
+
+    uint16_t bg_color;
+    uint16_t drawing_color;
+    uint16_t cursor_color;
+};
+struct draw_cast_state g_state;
 
 inline int min(int a, int b)
 {
@@ -205,52 +213,63 @@ void lcd_init(spi_device_handle_t spi)
     lcd_cmd(spi, 0x36); // Memory read format
     lcd_data(spi, 0x8);
 
-    lcd_screen_fill(spi, BLACK);
+    lcd_screen_fill(spi, g_state.bg_color);
+    lcd_pixel_write(spi, g_state.cursor_x, g_state.cursor_y, g_state.cursor_color);
 }
 
 void handle_input(char input, spi_device_handle_t spi)
 {
     if (input == ' ') {
-        drawing = !drawing;
-        if (drawing) {
-            draw_buffer[cursor_y][cursor_x] = 1;
+        g_state.drawing = !g_state.drawing;
+        if (g_state.drawing) {
+            g_state.draw_buffer[g_state.cursor_y][g_state.cursor_x] = 1;
         }
-        ESP_LOGI("DIRECTION", "Drawing flag set to: %d", drawing);
+        ESP_LOGI("DIRECTION", "Drawing flag set to: %d", g_state.drawing);
         return;
+    }
+
+    if (g_state.draw_buffer[g_state.cursor_y][g_state.cursor_x]) {
+        lcd_pixel_write(spi, g_state.cursor_x, g_state.cursor_y, g_state.drawing_color);
+    } else {
+        lcd_pixel_write(spi, g_state.cursor_x, g_state.cursor_y, g_state.bg_color);
     }
 
     if (input == 'w') {
         ESP_LOGI("DIRECTION", "Up");
-        cursor_y = max(0, cursor_y - 1);
+        g_state.cursor_y = max(0, g_state.cursor_y - 1);
     } else if (input == 'a') {
         ESP_LOGI("DIRECTION", "Left");
-        cursor_x = max(0, cursor_x - 1);
+        g_state.cursor_x = max(0, g_state.cursor_x - 1);
     } else if (input == 's') {
         ESP_LOGI("DIRECTION", "Down");
-        cursor_y = min(DISPLAY_HEIGHT - 1, cursor_y + 1);
+        g_state.cursor_y = min(DISPLAY_HEIGHT - 1, g_state.cursor_y + 1);
     } else if (input == 'd') {
         ESP_LOGI("DIRECTION", "Right");
-        cursor_x = min(DISPLAY_WIDTH - 1, cursor_x + 1);
+        g_state.cursor_x = min(DISPLAY_WIDTH - 1, g_state.cursor_x + 1);
     }
 
-    ESP_LOGI("DIRECTION", "New coords: %d, %d", cursor_y, cursor_x);
+    ESP_LOGI("DIRECTION", "New coords: %d, %d", g_state.cursor_y, g_state.cursor_x);
+    lcd_pixel_write(spi, g_state.cursor_x, g_state.cursor_y, g_state.cursor_color);
 
-    if (!drawing) {
+    if (!g_state.drawing) {
         return;
     }
-    draw_buffer[cursor_y][cursor_x] = 1;
-    lcd_pixel_write(spi, cursor_x, cursor_y, WHITE);
+    g_state.draw_buffer[g_state.cursor_y][g_state.cursor_x] = 1;
 }
 
 void app_main(void)
 {
-    cursor_x = 0;
-    cursor_y = 0;
-    drawing = false;
+    g_state.cursor_x = DISPLAY_WIDTH / 2;
+    g_state.cursor_y = DISPLAY_HEIGHT / 2;
+    g_state.drawing = false;
+
+    g_state.bg_color = BLACK;
+    g_state.drawing_color = WHITE;
+    g_state.cursor_color = RED;
 
     for (int y = 0; y < DISPLAY_HEIGHT; y++) {
         for (int x = 0; x < DISPLAY_HEIGHT; x++) {
-            draw_buffer[y][x] = 0;
+            g_state.draw_buffer[y][x] = 0;
         }
     }
 
