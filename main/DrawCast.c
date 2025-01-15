@@ -64,7 +64,8 @@ spi_device_handle_t lcd_spi_setup()
         .sclk_io_num = PIN_NUM_CLK,
         .miso_io_num = -1,
         .quadwp_io_num = -1,
-        .quadhd_io_num = -1
+        .quadhd_io_num = -1,
+        .max_transfer_sz = 32768
     };
     spi_device_interface_config_t devcfg = {
         .clock_speed_hz = 10 * 1000 * 1000,
@@ -144,11 +145,33 @@ void lcd_pixel_write(spi_device_handle_t spi, uint8_t x, uint8_t y, uint16_t val
 
 void lcd_screen_fill(spi_device_handle_t spi, uint16_t val)
 {
-    for (uint8_t y = 0; y < DISPLAY_HEIGHT; y++) {
-        for (uint8_t x = 0; x < DISPLAY_WIDTH; x++) {
-            lcd_pixel_write(spi, x, y, val);
-        }
-    }
+    uint8_t bytes[4];
+
+    // X coordinate
+    lcd_cmd(spi, 0x2a);
+    bytes[0] = 0;
+    bytes[1] = DISPLAY_OFFSET_X;
+    bytes[2] = 0;
+    bytes[3] = DISPLAY_OFFSET_X + DISPLAY_WIDTH - 1;
+    gpio_set_level(PIN_NUM_DC, 1);
+    lcd_spi_write(spi, bytes, 4);
+
+    // Y coordinate
+    lcd_cmd(spi, 0x2b);
+    bytes[0] = 0;
+    bytes[1] = DISPLAY_OFFSET_Y;
+    bytes[2] = 0;
+    bytes[3] = DISPLAY_OFFSET_Y + DISPLAY_HEIGHT - 1;
+    gpio_set_level(PIN_NUM_DC, 1);
+    lcd_spi_write(spi, bytes, 4);
+
+    // Val
+    lcd_cmd(spi, 0x2c);
+    uint8_t* framebuffer = malloc(DISPLAY_HEIGHT * DISPLAY_WIDTH * 2);
+    memset(framebuffer, 0, DISPLAY_HEIGHT * DISPLAY_WIDTH * 2);
+    gpio_set_level(PIN_NUM_DC, 1);
+    lcd_spi_write(spi, framebuffer, DISPLAY_HEIGHT * DISPLAY_WIDTH * 2);
+    free(framebuffer);
 }
 
 void lcd_init(spi_device_handle_t spi)
