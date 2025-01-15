@@ -29,11 +29,12 @@
 #define GREEN 0x7e0
 #define BLUE 0x1f
 
-#define LEFT_BUTTON_PIN 34
-#define RIGHT_BUTTON_PIN 33
-#define UP_BUTTON_PIN 35
-#define DOWN_BUTTON_PIN 39
-#define TOGGLE_DRAWING_BUTTON_PIN 36
+#define LEFT_BUTTON_PIN 26
+#define RIGHT_BUTTON_PIN 32
+#define UP_BUTTON_PIN 33
+#define DOWN_BUTTON_PIN 25
+#define TOGGLE_DRAWING_BUTTON_PIN 27
+#define PUSH_BUTTON_PIN_MASK ((1ULL << RIGHT_BUTTON_PIN) | (1ULL << LEFT_BUTTON_PIN) | (1ULL << UP_BUTTON_PIN) | (1ULL << DOWN_BUTTON_PIN) | (1ULL << TOGGLE_DRAWING_BUTTON_PIN))
 
 enum Input {
     LEFT,
@@ -289,9 +290,24 @@ void handle_uart_input(char input, spi_device_handle_t spi)
 void handle_push_button_input(spi_device_handle_t spi)
 {
     int right_button_output = gpio_get_level(RIGHT_BUTTON_PIN);
-    ESP_LOGI("MAIN", "Right button value: %d", right_button_output);
     if (right_button_output == 1) {
-        // handle_input(RIGHT, spi);
+        handle_input(RIGHT, spi);
+    }
+    int left_button_output = gpio_get_level(LEFT_BUTTON_PIN);
+    if (left_button_output == 1) {
+        handle_input(LEFT, spi);
+    }
+    int up_button_output = gpio_get_level(UP_BUTTON_PIN);
+    if (up_button_output == 1) {
+        handle_input(UP, spi);
+    }
+    int down_button_output = gpio_get_level(DOWN_BUTTON_PIN);
+    if (down_button_output == 1) {
+        handle_input(DOWN, spi);
+    }
+    int toggle_drawing_button_output = gpio_get_level(TOGGLE_DRAWING_BUTTON_PIN);
+    if (toggle_drawing_button_output == 1) {
+        handle_input(TOGGLE_DRAWING, spi);
     }
 }
 
@@ -323,6 +339,14 @@ void app_main(void)
     uart_driver_install(UART_NUM, BUF_SIZE, 0, 0, NULL, 0);
 
     // Push button input
+    gpio_config_t io_conf = {};
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pin_bit_mask = PUSH_BUTTON_PIN_MASK;
+    io_conf.pull_down_en = 1;
+    io_conf.pull_up_en = 0;
+    gpio_config(&io_conf);
+
     gpio_set_direction(RIGHT_BUTTON_PIN, GPIO_MODE_INPUT);
 
     // Setup ST7735S LCD
