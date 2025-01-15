@@ -308,6 +308,7 @@ void handle_push_button_input(spi_device_handle_t spi)
     int toggle_drawing_button_output = gpio_get_level(TOGGLE_DRAWING_BUTTON_PIN);
     if (toggle_drawing_button_output == 1) {
         handle_input(TOGGLE_DRAWING, spi);
+        vTaskDelay(pdMS_TO_TICKS(250));
     }
 }
 
@@ -361,5 +362,6 @@ void app_main(void)
             handle_uart_input(data[0], spi);
         }
         handle_push_button_input(spi);
+        vTaskDelay(pdMS_TO_TICKS(16));
     }
 }
