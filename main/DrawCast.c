@@ -1,10 +1,10 @@
-#include <stdio.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 
-#include "driver/uart.h"
-#include "driver/spi_master.h"
 #include "driver/gpio.h"
+#include "driver/spi_master.h"
+#include "driver/uart.h"
 
 #include "esp_log.h"
 
@@ -16,12 +16,12 @@
 #define DISPLAY_OFFSET_Y 2
 #define DISPLAY_OFFSET_X 1
 
-#define LCD_HOST     SPI3_HOST
+#define LCD_HOST SPI3_HOST
 #define PIN_NUM_MOSI 23
-#define PIN_NUM_CLK  18
-#define PIN_NUM_CS   5
-#define PIN_NUM_DC   2
-#define PIN_NUM_RST  4
+#define PIN_NUM_CLK 18
+#define PIN_NUM_CS 5
+#define PIN_NUM_DC 2
+#define PIN_NUM_RST 4
 
 #define WHITE 0xffff
 #define BLACK 0x0000
@@ -31,28 +31,31 @@ int cursor_x;
 int cursor_y;
 bool drawing;
 
-inline int min(int a, int b) {
+inline int min(int a, int b)
+{
     return a > b ? b : a;
 }
 
-inline int max(int a, int b) {
+inline int max(int a, int b)
+{
     return a < b ? b : a;
 }
 
-spi_device_handle_t lcd_spi_setup() {
+spi_device_handle_t lcd_spi_setup()
+{
     gpio_reset_pin(PIN_NUM_CS);
-	gpio_set_direction(PIN_NUM_CS, GPIO_MODE_OUTPUT);
-	gpio_set_level(PIN_NUM_CS, 0);
+    gpio_set_direction(PIN_NUM_CS, GPIO_MODE_OUTPUT);
+    gpio_set_level(PIN_NUM_CS, 0);
 
-	gpio_reset_pin(PIN_NUM_DC);
-	gpio_set_direction(PIN_NUM_DC, GPIO_MODE_OUTPUT);
-	gpio_set_level(PIN_NUM_DC, 0);
+    gpio_reset_pin(PIN_NUM_DC);
+    gpio_set_direction(PIN_NUM_DC, GPIO_MODE_OUTPUT);
+    gpio_set_level(PIN_NUM_DC, 0);
 
-	gpio_reset_pin(PIN_NUM_RST);
-	gpio_set_direction(PIN_NUM_RST, GPIO_MODE_OUTPUT);
-	gpio_set_level(PIN_NUM_RST, 0);
-	vTaskDelay(pdMS_TO_TICKS(100));
-	gpio_set_level(PIN_NUM_RST, 1);
+    gpio_reset_pin(PIN_NUM_RST);
+    gpio_set_direction(PIN_NUM_RST, GPIO_MODE_OUTPUT);
+    gpio_set_level(PIN_NUM_RST, 0);
+    vTaskDelay(pdMS_TO_TICKS(100));
+    gpio_set_level(PIN_NUM_RST, 1);
 
     esp_err_t ret;
     spi_device_handle_t spi;
@@ -79,33 +82,36 @@ spi_device_handle_t lcd_spi_setup() {
 
 void lcd_spi_write(spi_device_handle_t spi, const uint8_t* data, size_t data_length)
 {
-	spi_transaction_t spi_transaction;
-	esp_err_t ret;
+    spi_transaction_t spi_transaction;
+    esp_err_t ret;
 
-	if ( data_length > 0 ) {
-		memset( &spi_transaction, 0, sizeof( spi_transaction_t ) );
-		spi_transaction.length = data_length * 8;
-		spi_transaction.tx_buffer = data;
-		ret = spi_device_transmit( spi, &spi_transaction );
+    if (data_length > 0) {
+        memset(&spi_transaction, 0, sizeof(spi_transaction_t));
+        spi_transaction.length = data_length * 8;
+        spi_transaction.tx_buffer = data;
+        ret = spi_device_transmit(spi, &spi_transaction);
         ESP_ERROR_CHECK(ret);
-	}
+    }
 }
 
-void lcd_cmd(spi_device_handle_t spi, const uint8_t cmd) {
+void lcd_cmd(spi_device_handle_t spi, const uint8_t cmd)
+{
     uint8_t byte = 0;
     byte = cmd;
     gpio_set_level(PIN_NUM_DC, 0);
     lcd_spi_write(spi, &byte, 1);
 }
 
-void lcd_data(spi_device_handle_t spi, const uint8_t data) {
+void lcd_data(spi_device_handle_t spi, const uint8_t data)
+{
     uint8_t byte = 0;
     byte = data;
     gpio_set_level(PIN_NUM_DC, 1);
     lcd_spi_write(spi, &byte, 1);
 }
 
-void lcd_pixel_write(spi_device_handle_t spi, uint8_t x, uint8_t y, uint16_t val) {
+void lcd_pixel_write(spi_device_handle_t spi, uint8_t x, uint8_t y, uint16_t val)
+{
     x = x + DISPLAY_OFFSET_X;
     y = y + DISPLAY_OFFSET_Y;
 
@@ -139,7 +145,8 @@ void lcd_pixel_write(spi_device_handle_t spi, uint8_t x, uint8_t y, uint16_t val
     lcd_spi_write(spi, bytes, 2);
 }
 
-void lcd_screen_fill(spi_device_handle_t spi, uint16_t val) {
+void lcd_screen_fill(spi_device_handle_t spi, uint16_t val)
+{
     for (uint8_t y = 0; y < DISPLAY_HEIGHT; y++) {
         for (uint8_t x = 0; x < DISPLAY_WIDTH; x++) {
             lcd_pixel_write(spi, x, y, val);
@@ -147,7 +154,8 @@ void lcd_screen_fill(spi_device_handle_t spi, uint16_t val) {
     }
 }
 
-void lcd_init(spi_device_handle_t spi) {
+void lcd_init(spi_device_handle_t spi)
+{
     lcd_cmd(spi, 0x01); // SW reset
     vTaskDelay(150 / portTICK_PERIOD_MS);
 
@@ -174,7 +182,8 @@ void lcd_init(spi_device_handle_t spi) {
     lcd_screen_fill(spi, BLACK);
 }
 
-void handle_input(char input, spi_device_handle_t spi) {
+void handle_input(char input, spi_device_handle_t spi)
+{
     if (input == ' ') {
         drawing = !drawing;
         if (drawing) {
@@ -199,8 +208,10 @@ void handle_input(char input, spi_device_handle_t spi) {
     }
 
     ESP_LOGI("DIRECTION", "New coords: %d, %d", cursor_y, cursor_x);
-    
-    if (!drawing) { return; }
+
+    if (!drawing) {
+        return;
+    }
     draw_buffer[cursor_y][cursor_x] = 1;
     lcd_pixel_write(spi, cursor_x, cursor_y, WHITE);
 }
