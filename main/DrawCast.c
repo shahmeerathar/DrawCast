@@ -29,6 +29,20 @@
 #define GREEN 0x7e0
 #define BLUE 0x1f
 
+#define LEFT_BUTTON_PIN 34
+#define RIGHT_BUTTON_PIN 33
+#define UP_BUTTON_PIN 35
+#define DOWN_BUTTON_PIN 39
+#define TOGGLE_DRAWING_BUTTON_PIN 36
+
+enum Input {
+    LEFT,
+    RIGHT,
+    UP,
+    DOWN,
+    TOGGLE_DRAWING
+};
+
 struct draw_cast_state {
     char draw_buffer[DISPLAY_HEIGHT][DISPLAY_WIDTH];
 
@@ -217,9 +231,9 @@ void lcd_init(spi_device_handle_t spi)
     lcd_pixel_write(spi, g_state.cursor_x, g_state.cursor_y, g_state.cursor_color);
 }
 
-void handle_input(char input, spi_device_handle_t spi)
+void handle_input(enum Input inp, spi_device_handle_t spi)
 {
-    if (input == ' ') {
+    if (inp == TOGGLE_DRAWING) {
         g_state.drawing = !g_state.drawing;
         if (g_state.drawing) {
             g_state.draw_buffer[g_state.cursor_y][g_state.cursor_x] = 1;
@@ -234,16 +248,16 @@ void handle_input(char input, spi_device_handle_t spi)
         lcd_pixel_write(spi, g_state.cursor_x, g_state.cursor_y, g_state.bg_color);
     }
 
-    if (input == 'w') {
+    if (inp == UP) {
         ESP_LOGI("DIRECTION", "Up");
         g_state.cursor_y = max(0, g_state.cursor_y - 1);
-    } else if (input == 'a') {
+    } else if (inp == LEFT) {
         ESP_LOGI("DIRECTION", "Left");
         g_state.cursor_x = max(0, g_state.cursor_x - 1);
-    } else if (input == 's') {
+    } else if (inp == DOWN) {
         ESP_LOGI("DIRECTION", "Down");
         g_state.cursor_y = min(DISPLAY_HEIGHT - 1, g_state.cursor_y + 1);
-    } else if (input == 'd') {
+    } else if (inp == RIGHT) {
         ESP_LOGI("DIRECTION", "Right");
         g_state.cursor_x = min(DISPLAY_WIDTH - 1, g_state.cursor_x + 1);
     }
@@ -255,6 +269,30 @@ void handle_input(char input, spi_device_handle_t spi)
         return;
     }
     g_state.draw_buffer[g_state.cursor_y][g_state.cursor_x] = 1;
+}
+
+void handle_uart_input(char input, spi_device_handle_t spi)
+{
+    if (input == ' ') {
+        handle_input(TOGGLE_DRAWING, spi);
+    } else if (input == 'w') {
+        handle_input(UP, spi);
+    } else if (input == 'a') {
+        handle_input(LEFT, spi);
+    } else if (input == 's') {
+        handle_input(DOWN, spi);
+    } else if (input == 'd') {
+        handle_input(RIGHT, spi);
+    }
+}
+
+void handle_push_button_input(spi_device_handle_t spi)
+{
+    int right_button_output = gpio_get_level(RIGHT_BUTTON_PIN);
+    ESP_LOGI("MAIN", "Right button value: %d", right_button_output);
+    if (right_button_output == 1) {
+        // handle_input(RIGHT, spi);
+    }
 }
 
 void app_main(void)
@@ -284,6 +322,9 @@ void app_main(void)
     uart_param_config(UART_NUM, &uart_config);
     uart_driver_install(UART_NUM, BUF_SIZE, 0, 0, NULL, 0);
 
+    // Push button input
+    gpio_set_direction(RIGHT_BUTTON_PIN, GPIO_MODE_INPUT);
+
     // Setup ST7735S LCD
     spi_device_handle_t spi = lcd_spi_setup();
     lcd_init(spi);
@@ -293,7 +334,8 @@ void app_main(void)
     while (1) {
         int len = uart_read_bytes(UART_NUM, data, BUF_SIZE, 20 / portTICK_PERIOD_MS);
         if (len == 1) {
-            handle_input(data[0], spi);
+            handle_uart_input(data[0], spi);
         }
+        handle_push_button_input(spi);
     }
 }
