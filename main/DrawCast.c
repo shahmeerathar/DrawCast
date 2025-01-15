@@ -25,6 +25,9 @@
 
 #define WHITE 0xffff
 #define BLACK 0x0000
+#define RED 0xf800
+#define GREEN 0x7e0
+#define BLUE 0x1f
 
 char draw_buffer[DISPLAY_HEIGHT][DISPLAY_WIDTH];
 int cursor_x;
@@ -65,7 +68,7 @@ spi_device_handle_t lcd_spi_setup()
         .miso_io_num = -1,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
-        .max_transfer_sz = 32768
+        .max_transfer_sz = DISPLAY_WIDTH * DISPLAY_HEIGHT * 2
     };
     spi_device_interface_config_t devcfg = {
         .clock_speed_hz = 10 * 1000 * 1000,
@@ -168,7 +171,10 @@ void lcd_screen_fill(spi_device_handle_t spi, uint16_t val)
     // Val
     lcd_cmd(spi, 0x2c);
     uint8_t* framebuffer = malloc(DISPLAY_HEIGHT * DISPLAY_WIDTH * 2);
-    memset(framebuffer, 0, DISPLAY_HEIGHT * DISPLAY_WIDTH * 2);
+    uint16_t little_endian_val = ((val >> 8) & 0xff) | ((val & 0xff) << 8);
+    for (int i = 0; i < DISPLAY_HEIGHT * DISPLAY_WIDTH; i++) {
+        ((uint16_t*)framebuffer)[i] = little_endian_val;
+    }
     gpio_set_level(PIN_NUM_DC, 1);
     lcd_spi_write(spi, framebuffer, DISPLAY_HEIGHT * DISPLAY_WIDTH * 2);
     free(framebuffer);
@@ -197,7 +203,7 @@ void lcd_init(spi_device_handle_t spi)
     lcd_data(spi, 0x05);
 
     lcd_cmd(spi, 0x36); // Memory read format
-    lcd_data(spi, 0x0);
+    lcd_data(spi, 0x8);
 
     lcd_screen_fill(spi, BLACK);
 }
