@@ -13,8 +13,8 @@
 
 #define DISPLAY_HEIGHT 128
 #define DISPLAY_WIDTH 128
-#define DISPLAY_OFFSET_Y 2
-#define DISPLAY_OFFSET_X 1
+#define DISPLAY_OFFSET_Y 1
+#define DISPLAY_OFFSET_X 2
 
 #define LCD_HOST SPI3_HOST
 #define PIN_NUM_MOSI 23
@@ -114,34 +114,31 @@ void lcd_pixel_write(spi_device_handle_t spi, uint8_t x, uint8_t y, uint16_t val
 {
     x = x + DISPLAY_OFFSET_X;
     y = y + DISPLAY_OFFSET_Y;
-
-    // Y coordinate
-    gpio_set_level(PIN_NUM_DC, 0);
-    lcd_cmd(spi, 0x2a);
-    gpio_set_level(PIN_NUM_DC, 1);
     uint8_t bytes[4];
-    bytes[0] = 0;
-    bytes[1] = y;
-    bytes[2] = 0;
-    bytes[3] = y;
-    lcd_spi_write(spi, bytes, 4);
 
     // X coordinate
-    gpio_set_level(PIN_NUM_DC, 0);
-    lcd_cmd(spi, 0x2b);
-    gpio_set_level(PIN_NUM_DC, 1);
+    lcd_cmd(spi, 0x2a);
     bytes[0] = 0;
     bytes[1] = x;
     bytes[2] = 0;
     bytes[3] = x;
+    gpio_set_level(PIN_NUM_DC, 1);
+    lcd_spi_write(spi, bytes, 4);
+
+    // Y coordinate
+    lcd_cmd(spi, 0x2b);
+    bytes[0] = 0;
+    bytes[1] = y;
+    bytes[2] = 0;
+    bytes[3] = y;
+    gpio_set_level(PIN_NUM_DC, 1);
     lcd_spi_write(spi, bytes, 4);
 
     // Val
-    gpio_set_level(PIN_NUM_DC, 0);
     lcd_cmd(spi, 0x2c);
-    gpio_set_level(PIN_NUM_DC, 1);
     bytes[0] = (val >> 8) & 0xff;
     bytes[1] = val & 0xff;
+    gpio_set_level(PIN_NUM_DC, 1);
     lcd_spi_write(spi, bytes, 2);
 }
 
@@ -177,7 +174,7 @@ void lcd_init(spi_device_handle_t spi)
     lcd_data(spi, 0x05);
 
     lcd_cmd(spi, 0x36); // Memory read format
-    lcd_data(spi, 0x40);
+    lcd_data(spi, 0x0);
 
     lcd_screen_fill(spi, BLACK);
 }
