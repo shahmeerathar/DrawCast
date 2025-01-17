@@ -107,6 +107,9 @@ void app_main(void)
     display_screen_fill(display_spi, drawcast_state->bg_color);
     display_pixel_write(display_spi, drawcast_state->cursor_x, drawcast_state->cursor_y, drawcast_state->cursor_color);
 
+    // Networking
+    wifi_connect();
+
     ESP_LOGI("MAIN", "Ready!");
     while (1) {
         input_bitset inp_bits = handle_uart_input();
