@@ -12,6 +12,8 @@
 #define TOGGLE_DRAWING_BUTTON_PIN 27
 #define PUSH_BUTTON_PIN_MASK ((1ULL << RIGHT_BUTTON_PIN) | (1ULL << LEFT_BUTTON_PIN) | (1ULL << UP_BUTTON_PIN) | (1ULL << DOWN_BUTTON_PIN) | (1ULL << TOGGLE_DRAWING_BUTTON_PIN))
 
+const Input input_elems[NUM_INPUT_TYPES] = { LEFT, RIGHT, UP, DOWN, TOGGLE_DRAWING };
+
 void setup_uart_input()
 {
     uart_config_t uart_config = {
@@ -38,53 +40,55 @@ void setup_push_button_input()
     gpio_set_direction(RIGHT_BUTTON_PIN, GPIO_MODE_INPUT);
 }
 
-Input handle_uart_input()
+input_bitset handle_uart_input()
 {
     uint8_t data[BUF_SIZE];
     int len = uart_read_bytes(UART_NUM, data, BUF_SIZE, 20 / portTICK_PERIOD_MS);
-    if (len != 1) {
-        return NONE;
+    if (len == 0) {
+        return 0;
     }
 
     char input = data[0];
+    input_bitset inputs = 0;
     if (input == ' ') {
-        return TOGGLE_DRAWING;
+        inputs |= 1 << TOGGLE_DRAWING;
     } else if (input == 'w') {
-        return UP;
+        inputs |= 1 << UP;
     } else if (input == 'a') {
-        return LEFT;
+        inputs |= 1 << LEFT;
     } else if (input == 's') {
-        return DOWN;
+        inputs |= 1 << DOWN;
     } else if (input == 'd') {
-        return RIGHT;
+        inputs |= 1 << RIGHT;
     }
 
-    return NONE;
+    return inputs;
 }
 
-Input handle_push_button_input()
+input_bitset handle_push_button_input()
 {
+    input_bitset inputs = 0;
     int right_button_output = gpio_get_level(RIGHT_BUTTON_PIN);
     if (right_button_output == 1) {
-        return RIGHT;
+        inputs |= 1 << RIGHT;
     }
     int left_button_output = gpio_get_level(LEFT_BUTTON_PIN);
     if (left_button_output == 1) {
-        return LEFT;
+        inputs |= 1 << LEFT;
     }
     int up_button_output = gpio_get_level(UP_BUTTON_PIN);
     if (up_button_output == 1) {
-        return UP;
+        inputs |= 1 << UP;
     }
     int down_button_output = gpio_get_level(DOWN_BUTTON_PIN);
     if (down_button_output == 1) {
-        return DOWN;
+        inputs |= 1 << DOWN;
     }
     int toggle_drawing_button_output = gpio_get_level(TOGGLE_DRAWING_BUTTON_PIN);
     if (toggle_drawing_button_output == 1) {
         vTaskDelay(pdMS_TO_TICKS(250));
-        return TOGGLE_DRAWING;
+        inputs |= 1 << TOGGLE_DRAWING;
     }
 
-    return NONE;
+    return inputs;
 }

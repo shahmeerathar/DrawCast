@@ -28,10 +28,6 @@ inline int max(int a, int b)
 
 void handle_input(enum Input inp, spi_device_handle_t display_spi, drawcast_state* state)
 {
-    if (inp == NONE) {
-        return;
-    }
-
     if (inp == TOGGLE_DRAWING) {
         state->drawing = !state->drawing;
         if (state->drawing) {
@@ -71,6 +67,16 @@ void handle_input(enum Input inp, spi_device_handle_t display_spi, drawcast_stat
     state->draw_buffer[state->cursor_y][state->cursor_x] = 1;
 }
 
+void handle_input_bitset(input_bitset inp_bits, spi_device_handle_t display_spi, drawcast_state* state)
+{
+    for (int i = 0; i < NUM_INPUT_TYPES; i++) {
+        Input input = input_elems[i];
+        if (inp_bits & (1 << input)) {
+            handle_input(input, display_spi, state);
+        }
+    }
+}
+
 void init_state(drawcast_state* state)
 {
     state->cursor_x = DISPLAY_WIDTH / 2;
@@ -103,10 +109,10 @@ void app_main(void)
 
     ESP_LOGI("MAIN", "Ready!");
     while (1) {
-        Input inp = handle_uart_input();
-        handle_input(inp, display_spi, drawcast_state);
-        inp = handle_push_button_input();
-        handle_input(inp, display_spi, drawcast_state);
+        input_bitset inp_bits = handle_uart_input();
+        handle_input_bitset(inp_bits, display_spi, drawcast_state);
+        inp_bits = handle_push_button_input();
+        handle_input_bitset(inp_bits, display_spi, drawcast_state);
         vTaskDelay(pdMS_TO_TICKS(16));
     }
 
