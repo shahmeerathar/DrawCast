@@ -109,6 +109,7 @@ void app_main(void)
 
     // Networking
     wifi_connect();
+    mqtt_connect();
 
     ESP_LOGI("MAIN", "Ready!");
     while (1) {
