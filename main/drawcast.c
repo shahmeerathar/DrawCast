@@ -4,7 +4,7 @@
 #include "network.h"
 #include <stdbool.h>
 
-typedef struct drawcast_state {
+typedef struct drawcast_state_t {
     char draw_buffer[DISPLAY_HEIGHT][DISPLAY_WIDTH];
 
     int cursor_x;
@@ -16,6 +16,11 @@ typedef struct drawcast_state {
     uint16_t cursor_color;
 } drawcast_state;
 
+typedef struct mqtt_message_receive_context_t {
+    spi_device_handle_t display_spi;
+    drawcast_state* state;
+} mqtt_message_receive_context;
+
 inline int min(int a, int b)
 {
     return a > b ? b : a;
@@ -26,12 +31,31 @@ inline int max(int a, int b)
     return a < b ? b : a;
 }
 
+void publish_message_for_current_pixel(drawcast_state* state)
+{
+    char data[2];
+    data[0] = state->cursor_x & 0x7f;
+    data[1] = state->cursor_y & 0x7f;
+    mqtt_send_message(data);
+}
+
+void receive_message(char* message_data, void* context)
+{
+    int cursor_x = message_data[0];
+    int cursor_y = message_data[1];
+    ESP_LOGI("MQTT_RCV", "x: %d, y: %d", cursor_x, cursor_y);
+    mqtt_message_receive_context* ctx = (mqtt_message_receive_context*)context;
+    ctx->state->draw_buffer[cursor_x][cursor_y] = 1;
+    display_pixel_write(ctx->display_spi, cursor_x, cursor_y, ctx->state->drawing_color);
+}
+
 void handle_input(enum Input inp, spi_device_handle_t display_spi, drawcast_state* state)
 {
     if (inp == TOGGLE_DRAWING) {
         state->drawing = !state->drawing;
         if (state->drawing) {
             state->draw_buffer[state->cursor_y][state->cursor_x] = 1;
+            publish_message_for_current_pixel(state);
         }
         ESP_LOGI("DIRECTION", "Drawing flag set to: %d", state->drawing);
         return;
@@ -65,6 +89,7 @@ void handle_input(enum Input inp, spi_device_handle_t display_spi, drawcast_stat
         return;
     }
     state->draw_buffer[state->cursor_y][state->cursor_x] = 1;
+    publish_message_for_current_pixel(state);
 }
 
 void handle_input_bitset(input_bitset inp_bits, spi_device_handle_t display_spi, drawcast_state* state)
@@ -96,7 +121,7 @@ void init_state(drawcast_state* state)
 
 void app_main(void)
 {
-    drawcast_state* drawcast_state = malloc(sizeof(struct drawcast_state));
+    drawcast_state* drawcast_state = malloc(sizeof(struct drawcast_state_t));
     init_state(drawcast_state);
 
     setup_uart_input(); // Keyboard input from computer;
@@ -109,7 +134,10 @@ void app_main(void)
 
     // Networking
     wifi_connect();
-    mqtt_connect();
+    mqtt_message_receive_context msg_rcv_ctx;
+    msg_rcv_ctx.display_spi = display_spi;
+    msg_rcv_ctx.state = drawcast_state;
+    mqtt_connect(receive_message, &msg_rcv_ctx);
 
     ESP_LOGI("MAIN", "Ready!");
     while (1) {

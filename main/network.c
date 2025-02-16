@@ -5,7 +5,10 @@
 #include "freertos/task.h"
 #include "mqtt_client.h"
 #include "nvs_flash.h"
-#include "secret.h"
+
+static esp_mqtt_client_handle_t mqtt_client = NULL;
+static mqtt_message_callback_t mqtt_message_callback = NULL;
+static void* mqtt_message_callback_context = NULL;
 
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
     int32_t event_id, void* event_data)
@@ -44,10 +47,10 @@ static void mqtt_event_handler(void* handler_args, esp_event_base_t base, int32_
     switch (event->event_id) {
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI("MQTT", "MQTT Connected");
-        char* topic = "test_topic";
-        char* data = "Hello from ESP32";
-        int msg_id = esp_mqtt_client_publish(event->client, topic, data, 0, 1, 0);
-        ESP_LOGI("MQTT", "Published message ID: %d", msg_id);
+        esp_mqtt_client_subscribe(event->client, MQTT_SUB_TOPIC, 1);
+        break;
+    case MQTT_EVENT_DATA:
+        mqtt_message_callback(event->data, mqtt_message_callback_context);
         break;
     case MQTT_EVENT_DISCONNECTED:
         ESP_LOGI("MQTT", "MQTT Disconnected");
@@ -60,8 +63,11 @@ static void mqtt_event_handler(void* handler_args, esp_event_base_t base, int32_
     }
 }
 
-void mqtt_connect()
+void mqtt_connect(mqtt_message_callback_t cb, void* cb_context)
 {
+    mqtt_message_callback = cb;
+    mqtt_message_callback_context = cb_context;
+
     esp_mqtt_client_config_t mqtt_cfg = {
         .broker = {
             .address.uri = AWS_DOMAIN,
@@ -75,8 +81,14 @@ void mqtt_connect()
         },
     };
 
-    esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
-    esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
-    esp_mqtt_client_start(client);
+    mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
+    esp_mqtt_client_register_event(mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
+    esp_mqtt_client_start(mqtt_client);
     vTaskDelay(5000 / portTICK_PERIOD_MS);
+}
+
+void mqtt_send_message(char* data)
+{
+    int msg_id = esp_mqtt_client_publish(mqtt_client, MQTT_PUB_TOPIC, data, 0, 1, 0);
+    ESP_LOGI("MQTT", "Published message ID: %d", msg_id);
 }
